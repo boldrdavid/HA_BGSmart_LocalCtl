@@ -271,15 +271,16 @@ class ESPLocalDevice:
     async def get_params(self) -> Dict[str, Any]:
         """Get current device params."""
         _LOGGER.debug("Getting params")
-        
-        if not self._params_cache:
-            properties = await self.get_property_values()
-            if properties and "params" in properties:
-                self._params_cache = properties["params"]
-                _LOGGER.debug("Cached params: %s", self._params_cache)
-            else:
-                _LOGGER.warning("No params found in properties")
-        
+
+        # Always fetch fresh properties to capture physical changes (e.g. dimmer adjusted manually)
+        properties = await self.get_property_values()
+
+        if properties and "params" in properties:
+            self._params_cache = properties["params"]
+            _LOGGER.debug("Updated params from device: %s", self._params_cache)
+        else:
+            _LOGGER.warning("No params found in properties")
+
         return self._params_cache
     
     async def set_param(self, device_name: str, param_name: str, value: Any) -> bool:
