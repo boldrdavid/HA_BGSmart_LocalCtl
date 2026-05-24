@@ -138,7 +138,7 @@ class BGSmartDimmer(CoordinatorEntity, LightEntity):
                 int((self._attr_brightness / 255) * 100) if self._attr_brightness else 0
             )
         self.async_write_ha_state()
-    
+
     def _scale_ha_to_device(self, ha_val: int) -> int:
         """Scale Home Assistant brightness (0-255) to Device brightness (min-100) using Gamma curve."""
         if ha_val == 0:
