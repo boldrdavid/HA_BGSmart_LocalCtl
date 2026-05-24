@@ -23,17 +23,17 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up BG Smart Local Control from a config entry."""
+    # Lazy import to avoid blocking during startup
+    from .esp_local_control import ESPLocalDevice
     
-    # 1. Retrieve connection data
-    host = entry.data["host"]
+    # Prefer the host from options if the user updated it, otherwise fallback to initial data
+    host = entry.options.get("host", entry.data.get("host"))
     port = entry.data.get("port", 8080)
     node_id = entry.data.get("node_id", "")
     pop = entry.data["pop"]
-    
     # Always use Sec1 security for BG Smart devices
     security_type = 1
     
-    # 2. Initialize the connection
     device = ESPLocalDevice(host, port, node_id, pop, security_type)
     
     # 3. Setup Polling (Hardcoded to Default 30s)
@@ -62,10 +62,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         "host": host,
         "port": port
     }
-
+    
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     
+    # Listen for option updates (when user changes the IP address)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+    
     return True
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
