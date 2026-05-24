@@ -1,12 +1,15 @@
 """Config flow for BG Smart Local Control integration."""
+from __future__ import annotations
+
 import logging
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import callback
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.helpers import network
 
+# Import ESPLocalDevice at top level
+from .esp_local_control import ESPLocalDevice
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,7 +21,6 @@ CONF_SECURITY_TYPE = "security_type"
 # Force Sec1 security (encryption with PoP)
 SECURITY_TYPE_SEC1 = 1
 DEFAULT_PORT = 8080
-
 
 class BGSmartLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for BG Smart Local Control."""
@@ -35,8 +37,6 @@ class BGSmartLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             
             # Test connection
             try:
-                from .esp_local_control import ESPLocalDevice
-                
                 device = ESPLocalDevice(
                     user_input[CONF_HOST],
                     user_input[CONF_PORT],
@@ -69,7 +69,7 @@ class BGSmartLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema({
             vol.Required(CONF_HOST, default=suggested_ip): str,
             vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
-            vol.Required(CONF_POP, description="Proof of Possession (PoP) key"): str,
+            vol.Required(CONF_POP): str,
             vol.Optional(CONF_NODE_ID, default=""): str,
         })
 
@@ -81,7 +81,7 @@ class BGSmartLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "pop_help": "The PoP key is usually printed on the device label or found in the BG Smart app settings."
             }
         )
-    
+
     async def _get_ha_local_ip(self) -> str:
         """Get Home Assistant's local IP address."""
         try:
@@ -108,3 +108,37 @@ class BGSmartLocalConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             pass
         
         return "192.168.1.xxx"
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Get the options flow for this handler."""
+        return BGSmartOptionsFlow(config_entry)
+
+
+class BGSmartOptionsFlow(config_entries.OptionsFlow):
+    """Handle options for the BG Smart Dimmer (Update IP Address)."""
+
+    def __init__(self, config_entry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Manage the options."""
+        if user_input is not None:
+            # Save the new options
+            return self.async_create_entry(title="", data=user_input)
+
+        # Get current host (check options first if updated, otherwise fallback to original data)
+        current_host = self.config_entry.options.get(
+            CONF_HOST, self.config_entry.data.get(CONF_HOST)
+        )
+
+        options_schema = vol.Schema({
+            vol.Required(CONF_HOST, default=current_host): str,
+        })
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=options_schema
+        )
